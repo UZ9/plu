@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Display, sync::Arc, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 use axum::{
     extract::{ws::{Message, WebSocket}, WebSocketUpgrade}, response::IntoResponse, routing::get, Router
 };
@@ -6,69 +6,16 @@ use axum::{
 use futures::StreamExt;
 use futures::SinkExt;
 use rand::seq::IndexedRandom;
-use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, RwLock};
-use ts_rs::TS;
+
+use crate::types::{ClientMessage, HexData, ServerMessage, TerrainType, TileState};
 
 const MAP_WIDTH: u32 = 20;
 const MAP_HEIGHT: u32 = 40;
 
-#[derive(PartialEq, Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export, export_to = "../../frontend/types/types.ts")]
-enum TerrainType {
-    Wild,
-    Mine,
-    Turret,
-    Slime
-}
+pub mod types;
 
-impl Display for TerrainType {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Wild => write!(f, "Wild"),
-            Self::Mine => write!(f, "Mine"),
-            Self::Turret => write!(f, "Turret"),
-            Self::Slime => write!(f, "Slime"),
-        }
-    }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export, export_to = "../../frontend/types/types.ts")]
-struct HexData {
-    terrain: TerrainType,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export, export_to = "../../frontend/types/types.ts")]
-struct TileState {
-    col: i32,
-    row: i32,
-    data: HexData
-}
-
-type UpdateBroadcast = broadcast::Sender<Vec<TileState>>;
-
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export, export_to = "../../frontend/types/types.ts")]
-#[serde(tag = "type")]
-enum ClientMessage {
-    #[serde(rename = "request_grid_state")]
-    RequestGridState,
-    #[serde(rename = "tile_update")]
-    TileUpdate { col: i32, row: i32, data: HexData }
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-#[ts(export, export_to = "../../frontend/types/types.ts")]
-#[serde(tag = "type")]
-enum ServerMessage {
-    #[serde(rename = "grid_state")]
-    GridState { width: u32, height: u32, tiles: Vec<TileState> },
-    #[serde(rename = "tile_update")]
-    TileUpdate { col: i32, row: i32, data: HexData }
-}
-
+pub type UpdateBroadcast = broadcast::Sender<Vec<TileState>>;
 type GameState = Arc<RwLock<HashMap<(i32, i32), HexData>>>;
 
 fn initialize_grid() -> HashMap<(i32, i32), HexData> {
@@ -122,7 +69,7 @@ async fn game_loop(state: GameState, tx: UpdateBroadcast) {
                             row: pos.1,
                             data: hex.clone()
                         });
-                    }
+                }
             }
         }
 
@@ -158,34 +105,32 @@ async fn main() {
 
 async fn handle_socket(socket: WebSocket, state: GameState, broadcast_tx: UpdateBroadcast) {
 
+    let (sender, mut receiver) = socket.split();
 
-   let (sender, mut receiver) = socket.split();
+    let sender = Arc::new(tokio::sync::Mutex::new(sender));
+    let sender_clone = sender.clone();
 
+    let mut broadcast_rx = broadcast_tx.subscribe();
 
-   let sender = Arc::new(tokio::sync::Mutex::new(sender));
-   let sender_clone = sender.clone();
+    // broadcast 
+    let send_task = tokio::spawn(async move {
+        while let Ok(updates) = broadcast_rx.recv().await {
+            let mut sender = sender_clone.lock().await;
 
-   let mut broadcast_rx = broadcast_tx.subscribe();
+            for tile in updates {
+                let response = ServerMessage::TileUpdate {
+                    col: tile.col,
+                    row: tile.row,
+                    data: tile.data
+                };
 
-   // broadcast 
-   let send_task = tokio::spawn(async move {
-       while let Ok(updates) = broadcast_rx.recv().await {
-           let mut sender = sender_clone.lock().await;
-
-           for tile in updates {
-               let response = ServerMessage::TileUpdate {
-                   col: tile.col,
-                   row: tile.row,
-                   data: tile.data
-               };
-
-               if let Ok(json) = serde_json::to_string(&response)
-                   && sender.send(Message::Text(json.into())).await.is_err() {
-                       break;
-                   }
-           }
-       }
-   });
+                if let Ok(json) = serde_json::to_string(&response)
+                    && sender.send(Message::Text(json.into())).await.is_err() {
+                        break;
+                }
+            }
+        }
+    });
 
     while let Some(Ok(msg)) = receiver.next().await {
         if let Message::Text(text) = msg {
@@ -200,9 +145,7 @@ async fn handle_socket(socket: WebSocket, state: GameState, broadcast_tx: Update
                             row: *row,
                             data: data.clone(),
                         })
-                        .collect();
-
-
+                    .collect();
 
                     let response = ServerMessage::GridState { tiles, width: MAP_WIDTH, height: MAP_HEIGHT };
                     if let Ok(json) = serde_json::to_string(&response) {
@@ -211,9 +154,7 @@ async fn handle_socket(socket: WebSocket, state: GameState, broadcast_tx: Update
                     }
                 }
                 Ok(ClientMessage::TileUpdate { col, row, data }) => {
-
                     println!("[REQUEST] tile update");
-                    // Update state
                     {
                         let mut grid = state.write().await;
                         grid.insert((col, row), data.clone());
@@ -229,9 +170,5 @@ async fn handle_socket(socket: WebSocket, state: GameState, broadcast_tx: Update
             }
         }
     }
-
-
     send_task.abort();
-
-
 }
