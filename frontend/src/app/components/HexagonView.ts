@@ -5,7 +5,7 @@ import { hexPoints, hexToPixel } from "../utils/mathUtils";
 const terrainColors: Record<TerrainType, number> = {
   "Mine": 0x4CAF50,
   "Slime": 0x757575,
-  "Wild": 0x2196F3,
+  "Wild": 0x4CAF50,
   "Turret": 0x2196F3,
 };
 

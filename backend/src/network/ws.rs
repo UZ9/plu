@@ -38,38 +38,40 @@ async fn handle_socket(socket: WebSocket, state: Arc<RwLock<GridState>>, broadca
 
     debug!("New socket connection formed");
 
-    // select! documentation (wild):
-    // https://tokio.rs/tokio/tutorial/select
-    tokio::select! {
-        Ok(updates) = broadcast_rx.recv() => {
-            for tile in updates {
-                let response = ServerMessage::TileUpdate {
-                    col: tile.col,
-                    row: tile.row,
-                    data: tile.data
-                };
+    loop {
+        // select! documentation (wild):
+        // https://tokio.rs/tokio/tutorial/select
+        tokio::select! {
+            Ok(updates) = broadcast_rx.recv() => {
+                for tile in updates {
+                    let response = ServerMessage::TileUpdate {
+                        col: tile.col,
+                        row: tile.row,
+                        data: tile.data
+                    };
 
-                if let Ok(json) = serde_json::to_string(&response)
-                    && sender.send(Message::Text(json.into())).await.is_err() {
-                        break;
+                    if let Ok(json) = serde_json::to_string(&response)
+                        && sender.send(Message::Text(json.into())).await.is_err() {
+                            break;
+                    }
                 }
-            }
-        },
-        Some(Ok(msg)) = receiver.next() => {
-            if let Message::Text(text) = msg {
-                let message = serde_json::from_str::<ClientMessage>(&text);
+            },
+            Some(Ok(msg)) = receiver.next() => {
+                if let Message::Text(text) = msg {
+                    let message = serde_json::from_str::<ClientMessage>(&text);
 
-                if let Ok(message) = message {
-                    // successfully received client message
-                    let response = on_receive_message(&state, &broadcast_tx, message).await;
+                    if let Ok(message) = message {
+                        // successfully received client message
+                        let response = on_receive_message(&state, &broadcast_tx, message).await;
 
-                    // potential server message
-                    if let Some(response) = response
-                        && let Ok(json) = serde_json::to_string(&response) {
-                            let _ = sender.send(Message::Text(json.into())).await;
-                        }
+                        // potential server message
+                        if let Some(response) = response
+                            && let Ok(json) = serde_json::to_string(&response) {
+                                let _ = sender.send(Message::Text(json.into())).await;
+                            }
+                    }
+
                 }
-
             }
         }
     }
