@@ -1,8 +1,8 @@
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
 
 use tokio::sync::{broadcast, RwLock};
 
-use crate::{api::grid_api::GridState, network::ws::WebSocketHandler, types::{HexData, TerrainType, TileState}};
+use crate::{api::grid_api::GridState, network::ws::WebSocketServer, types::{HexData, TerrainType, TileState}};
 
 const MAP_WIDTH: u32 = 20;
 const MAP_HEIGHT: u32 = 40;
@@ -15,24 +15,6 @@ pub mod api;
 pub mod network;
 
 pub type UpdateBroadcast = broadcast::Sender<Vec<TileState>>;
-
-fn initialize_grid() -> GridState {
-    let mut grid = HashMap::new();
-
-    for row in 0..MAP_WIDTH {
-        for col in 0..MAP_HEIGHT {
-            grid.insert((col as i32, row as i32), HexData {
-                terrain: STARTER_TILE.clone(),
-            });
-        }
-    }
-
-    GridState {
-        width: MAP_WIDTH,
-        height: MAP_HEIGHT,
-        tiles: grid
-    }
-}
 
 async fn game_loop(state: Arc<RwLock<GridState>>, tx: UpdateBroadcast) {
     let mut interval = tokio::time::interval(Duration::from_secs(5));
@@ -69,7 +51,7 @@ async fn main() {
     let state = Arc::new(RwLock::new(GridState::new(
                 MAP_WIDTH,
                 MAP_HEIGHT,
-                TerrainType::Wild
+                STARTER_TILE
     )));
 
     let (tx, _) = broadcast::channel::<Vec<TileState>>(100);
@@ -82,6 +64,6 @@ async fn main() {
         game_loop(state_clone, tx_clone).await;
     });
 
-    let ws_handler = WebSocketHandler::new("/ws".to_string());
+    let ws_handler = WebSocketServer::new("/ws".to_string());
     ws_handler.start_server(SERVER_URL.parse().unwrap(), state, tx).await;
 }

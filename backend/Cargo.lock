@@ -85,6 +85,7 @@ dependencies = [
  "axum",
  "future-utils",
  "futures 0.3.31",
+ "log 0.4.28",
  "rand",
  "serde",
  "serde_json",

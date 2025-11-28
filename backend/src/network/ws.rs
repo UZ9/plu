@@ -1,69 +1,47 @@
-use std::{net::SocketAddr, sync::{Arc}};
+
+use std::{net::SocketAddr, sync::Arc};
 
 use axum::{extract::{ws::{Message, WebSocket}, WebSocketUpgrade}, response::IntoResponse, routing::get, Router};
 
 use futures::StreamExt;
 use futures::SinkExt;
-use tokio::sync::{broadcast::Sender, RwLock};
+use log::{debug, info};
+use tokio::sync::RwLock;
 
 use crate::{api::grid_api::GridState, types::{ClientMessage, ServerMessage, TileState}, UpdateBroadcast, MAP_HEIGHT, MAP_WIDTH};
 
-pub struct WebSocketHandler {
+pub struct WebSocketServer {
     path: String
 }
 
-async fn ws_handler(
-    ws: WebSocketUpgrade,
-    axum::extract::State((state, tx)): axum::extract::State<(Arc<RwLock<GridState>>, UpdateBroadcast)>,
-) -> impl IntoResponse {
-    ws.on_upgrade(|socket| handle_socket(socket, state, tx))
-}
-
-impl WebSocketHandler {
+impl WebSocketServer {
     pub fn new(path: String) -> Self {
-        WebSocketHandler {
+        WebSocketServer {
             path
         }
     }
 
-    pub async fn start_server(&self, addr: SocketAddr, state: Arc<RwLock<GridState>>, tx: Sender<Vec<TileState>>) {
+    pub async fn start_server(&self, addr: SocketAddr, state: Arc<RwLock<GridState>>, tx: UpdateBroadcast) {
         let app = Router::new().route(&self.path, get(ws_handler)).with_state((state, tx));
 
         let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
 
-        println!("listening on {addr}");
+        info!("websocket server listening on {addr}");
 
         axum::serve(listener, app).await.unwrap();
     }
-
-    fn send_message(message: ServerMessage, state: Arc<RwLock<GridState>>, tx: Sender<Vec<TileState>>) {
-        todo!()
-    }
-
-    fn on_receive_message(message: ClientMessage) {
-        todo!()
-    }
-
-    fn get_router() -> axum::Router {
-        todo!()
-    }
 }
 
-
 async fn handle_socket(socket: WebSocket, state: Arc<RwLock<GridState>>, broadcast_tx: UpdateBroadcast) {
-
-    let (sender, mut receiver) = socket.split();
-
-    let sender = Arc::new(tokio::sync::Mutex::new(sender));
-    let sender_clone = sender.clone();
-
+    let (mut sender, mut receiver) = socket.split();
     let mut broadcast_rx = broadcast_tx.subscribe();
 
-    // broadcast 
-    let send_task = tokio::spawn(async move {
-        while let Ok(updates) = broadcast_rx.recv().await {
-            let mut sender = sender_clone.lock().await;
+    debug!("New socket connection formed");
 
+    // select! documentation (wild):
+    // https://tokio.rs/tokio/tutorial/select
+    tokio::select! {
+        Ok(updates) = broadcast_rx.recv() => {
             for tile in updates {
                 let response = ServerMessage::TileUpdate {
                     col: tile.col,
@@ -76,47 +54,64 @@ async fn handle_socket(socket: WebSocket, state: Arc<RwLock<GridState>>, broadca
                         break;
                 }
             }
-        }
-    });
+        },
+        Some(Ok(msg)) = receiver.next() => {
+            if let Message::Text(text) = msg {
+                let message = serde_json::from_str::<ClientMessage>(&text);
 
-    while let Some(Ok(msg)) = receiver.next().await {
-        if let Message::Text(text) = msg {
-            match serde_json::from_str::<ClientMessage>(&text) {
-                Ok(ClientMessage::RequestGridState) => {
-                    println!("[REQUEST] request grid state");
-                    let grid = state.read().await;
-                    let tiles: Vec<TileState> = grid
-                        .tiles
-                        .iter()
-                        .map(|((col, row), data)| TileState {
-                            col: *col,
-                            row: *row,
-                            data: data.clone(),
-                        })
-                    .collect();
+                if let Ok(message) = message {
+                    // successfully received client message
+                    let response = on_receive_message(&state, &broadcast_tx, message).await;
 
-                    let response = ServerMessage::GridState { tiles, width: MAP_WIDTH, height: MAP_HEIGHT };
-                    if let Ok(json) = serde_json::to_string(&response) {
-                        let mut sender = sender.lock().await;
-                        let _ = sender.send(Message::Text(json.into())).await;
-                    }
+                    // potential server message
+                    if let Some(response) = response
+                        && let Ok(json) = serde_json::to_string(&response) {
+                            let _ = sender.send(Message::Text(json.into())).await;
+                        }
                 }
-                Ok(ClientMessage::TileUpdate { col, row, data }) => {
-                    println!("[REQUEST] tile update");
-                    {
-                        let mut grid = state.write().await;
-                        grid.tiles.insert((col, row), data.clone());
-                    }
 
-                    let update = vec![TileState { col, row, data }];
-                    let _ = broadcast_tx.send(update);
-
-                }
-                Err(e) => {
-                    eprintln!("Failed to parse message: {}", e);
-                }
             }
         }
     }
-    send_task.abort();
 }
+
+async fn on_receive_message(state: &Arc<RwLock<GridState>>, tx: &UpdateBroadcast, message: ClientMessage) -> Option<ServerMessage> {
+    match message {
+        ClientMessage::RequestGridState => {
+            debug!("[REQUEST] request grid state");
+
+            let grid = state.read().await;
+            let tiles: Vec<TileState> = grid
+                .tiles
+                .iter()
+                .map(|((col, row), data)| TileState {
+                    col: *col,
+                    row: *row,
+                    data: data.clone(),
+                })
+            .collect();
+
+            Some(ServerMessage::GridState { tiles, width: MAP_WIDTH, height: MAP_HEIGHT })
+        }
+        ClientMessage::TileUpdate { col, row, data } => {
+            debug!("[REQUEST] tile update");
+            {
+                let mut grid = state.write().await;
+                grid.tiles.insert((col, row), data.clone());
+            }
+
+            let update = vec![TileState { col, row, data }];
+            let _ = tx.send(update);
+
+            None
+        }
+    }
+}
+
+async fn ws_handler(
+    ws: WebSocketUpgrade,
+    axum::extract::State((state, tx)): axum::extract::State<(Arc<RwLock<GridState>>, UpdateBroadcast)>,
+) -> impl IntoResponse {
+    ws.on_upgrade(|socket| handle_socket(socket, state, tx))
+}
+
