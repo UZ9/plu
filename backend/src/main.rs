@@ -1,11 +1,12 @@
 use std::{sync::Arc, time::Duration};
 
+use log::debug;
 use tokio::sync::{broadcast, RwLock};
 
-use crate::{api::grid_api::GridState, network::ws::WebSocketServer, types::{HexData, TerrainType, TileState}};
+use crate::{api::grid_api::GridState, network::ws::WebSocketServer, types::{TerrainType, TileState}};
 
-const MAP_WIDTH: u32 = 20;
-const MAP_HEIGHT: u32 = 40;
+const MAP_WIDTH: usize = 20;
+const MAP_HEIGHT: usize = 40;
 const STARTER_TILE: TerrainType = TerrainType::Wild;
 
 const SERVER_URL: &str = "0.0.0.0:9001";
@@ -22,14 +23,8 @@ async fn game_loop(state: Arc<RwLock<GridState>>, tx: UpdateBroadcast) {
     loop {
         interval.tick().await;
 
-        let mut updates = Vec::new();
-
         {
-            let mut grid = state.write().await;
-
-            let positions: Vec<_> = grid.tiles.keys().copied().collect();
-
-            println!("sending update...");
+            debug!("sending update...");
 
             // 3 updates to happen (maybe not in this order)
             // 1. miner update 
@@ -39,15 +34,17 @@ async fn game_loop(state: Arc<RwLock<GridState>>, tx: UpdateBroadcast) {
             // rust traits 
         }
 
-        if !updates.is_empty() {
-            let _ = tx.send(updates);
-        }
+        // if !updates.is_empty() {
+        //     let _ = tx.send(updates);
+        // }
     }
 
 }
 
 #[tokio::main]
 async fn main() {
+    env_logger::init();
+
     let state = Arc::new(RwLock::new(GridState::new(
                 MAP_WIDTH,
                 MAP_HEIGHT,

@@ -48,6 +48,7 @@ export class WebSocketManager {
     };
 
     this.socket.onclose = () => {
+      logInfo("WebSocket closed");
       setTimeout(() => this.connect(), 3065);
     };
   }

@@ -70,7 +70,7 @@ pub enum ClientMessage {
 #[serde(tag = "type")]
 pub enum ServerMessage {
     #[serde(rename = "grid_state")]
-    GridState { width: u32, height: u32, tiles: Vec<TileState> },
+    GridState { width: usize, height: usize, tiles: Vec<HexData> },
     #[serde(rename = "tile_update")]
     TileUpdate { col: i32, row: i32, data: HexData }
 }

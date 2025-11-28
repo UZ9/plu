@@ -1,29 +1,37 @@
-use std::collections::HashMap;
-
 use crate::types::{HexData, TerrainType};
 
 pub struct GridState {
-    pub width: u32,
-    pub height: u32,
-    pub tiles: HashMap<(i32, i32), HexData>
+    pub width: usize,
+    pub height: usize,
+    pub tiles: Vec<HexData>
 }
 
 impl GridState {
-    pub fn new(width: u32, height: u32, starter_tile: TerrainType) -> Self {
-        let mut grid = HashMap::new();
-
-        for row in 0..width {
-            for col in 0..height {
-                grid.insert((col as i32, row as i32), HexData {
-                    terrain: starter_tile.clone(),
-                });
-            }
-        }
+    pub fn new(width: usize, height: usize, starter_tile: TerrainType) -> Self {
+        let tiles = vec![HexData { terrain: starter_tile }; width * height];
 
         GridState {
             width,
             height,
-            tiles: grid
+            tiles
+        }
+    }
+
+    pub fn get_index(&self, x: u32, y: u32) -> usize {
+        (y as usize * self.width) + x as usize
+    }
+
+    pub fn get_tile(&self, x: u32, y: u32) -> Option<&HexData> {
+        self.tiles.get(self.get_index(x, y))
+    }
+
+    pub fn set_tile(&mut self, x: u32, y: u32, new_tile: HexData) {
+        let index = self.get_index(x, y);
+
+        let tile = self.tiles.get_mut(index);
+
+        if let Some(tile) = tile {
+            *tile = new_tile;
         }
     }
 }
