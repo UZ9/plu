@@ -1,13 +1,32 @@
-use std::fmt::Display;
+use std::{collections::HashMap, fmt::Display};
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 #[derive(PartialEq, Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export, export_to = "../../frontend/types/types.ts")]
+pub struct TurretData {
+    level: u32,
+    // in the future it could be neat to require ammo
+    state: String,
+}
+
+#[derive(PartialEq, Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../frontend/types/types.ts")]
+pub struct MineData {
+    level: u32,
+    count: u32, // how much gold i currently have
+    capacity: u32, // how much gold i can have at max (might be dynamic in future)
+    state: String, // we'll have a string that you can arbitarily put data into for "persistence"
+    trade_value: u32 // bad name for this, but >0 is me offering gold to the networking, <0 is me
+                     // requesting gold from the network
+}
+
+#[derive(PartialEq, Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../frontend/types/types.ts")]
 pub enum TerrainType {
     Wild,
-    Mine,
-    Turret,
+    Mine(MineData),
+    Turret(TurretData),
     Slime
 }
 
@@ -15,8 +34,8 @@ impl Display for TerrainType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Wild => write!(f, "Wild"),
-            Self::Mine => write!(f, "Mine"),
-            Self::Turret => write!(f, "Turret"),
+            Self::Mine(_) => write!(f, "Mine"),
+            Self::Turret(_) => write!(f, "Turret"),
             Self::Slime => write!(f, "Slime"),
         }
     }
