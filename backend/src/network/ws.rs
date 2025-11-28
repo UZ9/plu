@@ -94,15 +94,13 @@ async fn on_receive_message(state: &Arc<RwLock<GridState>>, tx: &UpdateBroadcast
                 let mut grid = state.write().await;
 
                 grid.set_tile(col as u32, row as u32, HexData {
-                    terrain: data.terrain
+                    terrain: data.terrain.clone()
                 })
 
             }
 
-            // let update = vec![TileState { col, row, data }];
-            // let _ = tx.send(update);
-
-            None
+            // acknowledged on backend, now update client
+            Some(ServerMessage::TileUpdate { col, row, data })
         }
     }
 }
