@@ -99,7 +99,7 @@ async fn on_receive_message(state: &Arc<RwLock<GridState>>, tx: &UpdateBroadcast
                 }
             });
 
-            Some(ServerMessage::GridState { tiles: update, width: MAP_WIDTH, height: MAP_HEIGHT })
+            Some(ServerMessage::GridState { tiles: update, width: grid.width, height: grid.height })
         }
         ClientMessage::TileUpdate { col, row, data } => {
             debug!("[REQUEST] tile update for <col: {col}, row: {row}>");
@@ -111,7 +111,8 @@ async fn on_receive_message(state: &Arc<RwLock<GridState>>, tx: &UpdateBroadcast
 
             // acknowledged on backend, now update client
             Some(ServerMessage::TileUpdate { row, col, data })
-        }
+        },
+        _ => None
     }
 }
 
@@ -122,3 +123,95 @@ async fn ws_handler(
     ws.on_upgrade(|socket| handle_socket(socket, state, tx))
 }
 
+#[cfg(test)]
+mod tests {
+    use tokio::sync::broadcast;
+
+    use super::*;
+
+    #[test]
+    fn it_sets_websocket_path_on_initialization() {
+        let path = "ws://somesocketaddr";
+
+        let ws = WebSocketServer::new(path.to_string());
+
+        assert_eq!(ws.path, path);
+    }
+
+    #[tokio::test]
+    async fn it_returns_nothing_if_invalid_received_message() {
+        let state: Arc<RwLock<GridState>> = Arc::new(RwLock::new(GridState::new(
+            10,
+            10,
+            HexTile::Wild
+        )));
+
+
+        let (tx, _) = broadcast::channel::<Vec<TileState>>(100);
+
+        let response = on_receive_message(&state, &tx, ClientMessage::None).await;
+
+        assert!(response.is_none());
+    }
+
+    #[tokio::test]
+    async fn it_returns_tile_update_for_tile_request() {
+        let state: Arc<RwLock<GridState>> = Arc::new(RwLock::new(GridState::new(
+            10,
+            10,
+            HexTile::Wild
+        )));
+
+
+        let (tx, _) = broadcast::channel::<Vec<TileState>>(100);
+
+        let update = ClientMessage::TileUpdate { col: 1, row: 0, data: HexTile::Slime };
+        let expected_response = ServerMessage::TileUpdate { col: 1, row: 0, data: HexTile::Slime };
+
+        let response = on_receive_message(&state, &tx, update).await;
+
+        assert!(response.is_some());
+
+        let response = response.unwrap();
+
+        assert_eq!(response, expected_response);
+    }
+
+    #[tokio::test]
+    async fn it_returns_grid_state_for_request() {
+        let state: Arc<RwLock<GridState>> = Arc::new(RwLock::new(GridState::new(
+            15,
+            10,
+            HexTile::Wild
+        )));
+
+        let grid = state.read().await;
+
+        let (tx, _) = broadcast::channel::<Vec<TileState>>(100);
+
+        let update = ClientMessage::RequestGridState;
+
+        let response = on_receive_message(&state, &tx, update).await;
+
+        assert!(response.is_some());
+
+        let response = response.unwrap();
+
+        match response {
+            ServerMessage::GridState { width, height, tiles } => {
+                assert_eq!(width, 15);
+                assert_eq!(height, 10);
+                assert_eq!(tiles.len(), grid.tiles.len());
+                assert_eq!(tiles.len(), 15 * 10);
+
+                tiles.iter().for_each(|tile| {
+                    assert_eq!(tile.data.clone(), HexTile::Wild);
+                });
+            },
+            _ => {
+                panic!("invalid response")
+            }
+        }
+    }
+
+}

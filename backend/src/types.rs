@@ -41,7 +41,7 @@ impl Display for HexTile {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[derive(PartialEq, Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export, export_to = "../../frontend/types/types.ts")]
 pub struct TileState {
     pub col: i32,
@@ -56,10 +56,11 @@ pub enum ClientMessage {
     #[serde(rename = "request_grid_state")]
     RequestGridState,
     #[serde(rename = "tile_update")]
-    TileUpdate { col: i32, row: i32, data: HexTile }
+    TileUpdate { col: i32, row: i32, data: HexTile },
+    None
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[derive(PartialEq, Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export, export_to = "../../frontend/types/types.ts")]
 #[serde(tag = "type")]
 pub enum ServerMessage {
