@@ -8,7 +8,7 @@ use futures::SinkExt;
 use log::{debug, info};
 use tokio::sync::RwLock;
 
-use crate::{api::grid_api::GridState, types::{ClientMessage, HexData, ServerMessage, TileState}, UpdateBroadcast, MAP_HEIGHT, MAP_WIDTH};
+use crate::{api::grid_api::GridState, types::{ClientMessage, HexTile, ServerMessage, TileState}, UpdateBroadcast, MAP_HEIGHT, MAP_WIDTH};
 
 pub struct WebSocketServer {
     path: String
@@ -83,24 +83,34 @@ async fn on_receive_message(state: &Arc<RwLock<GridState>>, tx: &UpdateBroadcast
             debug!("[REQUEST] request grid state");
 
             let grid = state.read().await;
-            let tiles: &Vec<HexData> = &grid
+            let tiles: &Vec<HexTile> = &grid
                 .tiles;
 
-            Some(ServerMessage::GridState { tiles: tiles.to_vec(), width: MAP_WIDTH, height: MAP_HEIGHT })
+
+            let mut update = Vec::new();
+
+            (0..grid.width).for_each(|i| {
+                for j in 0..grid.height {
+                    update.push(TileState {
+                        data: tiles[i].clone(),
+                        row: i as i32,
+                        col: j as i32
+                    });
+                }
+            });
+
+            Some(ServerMessage::GridState { tiles: update, width: MAP_WIDTH, height: MAP_HEIGHT })
         }
         ClientMessage::TileUpdate { col, row, data } => {
-            debug!("[REQUEST] tile update");
+            debug!("[REQUEST] tile update for <col: {col}, row: {row}>");
             {
                 let mut grid = state.write().await;
 
-                grid.set_tile(col as u32, row as u32, HexData {
-                    terrain: data.terrain.clone()
-                })
-
+                grid.set_tile(col as u32, row as u32, data.clone())
             }
 
             // acknowledged on backend, now update client
-            Some(ServerMessage::TileUpdate { col, row, data })
+            Some(ServerMessage::TileUpdate { row, col, data })
         }
     }
 }

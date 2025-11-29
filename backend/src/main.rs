@@ -3,11 +3,11 @@ use std::{sync::Arc, time::Duration};
 use log::debug;
 use tokio::sync::{broadcast, RwLock};
 
-use crate::{api::grid_api::GridState, network::ws::WebSocketServer, types::{TerrainType, TileState}};
+use crate::{api::grid_api::GridState, network::ws::WebSocketServer, types::{HexTile, TileState}};
 
 const MAP_WIDTH: usize = 20;
 const MAP_HEIGHT: usize = 40;
-const STARTER_TILE: TerrainType = TerrainType::Wild;
+const STARTER_TILE: HexTile = HexTile::Wild;
 
 const SERVER_URL: &str = "0.0.0.0:9001";
 

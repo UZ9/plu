@@ -1,5 +1,5 @@
 import * as PIXI from "pixi.js";
-import { HexData, TerrainType } from "../../../../types/types";
+import { HexTile } from "../../../../types/types";
 import { WebSocketManager } from "../../network/socket";
 import { HexagonView } from "../../components/HexagonView";
 
@@ -10,13 +10,13 @@ const TOOLTIP_STYLE: PIXI.TextStyleOptions = {
   stroke: { color: 0x000000, width: 3 },
 }
 
-const DEFAULT_TERRAIN: TerrainType = "Wild";
+const DEFAULT_TERRAIN: HexTile = "Slime";
 
 export class HexMapScreen extends PIXI.Container {
   private tooltip!: PIXI.Text;
   private tooltipBackground!: PIXI.Graphics;
   private hexes: HexagonView[] = [];
-  private hexMap: Map<string, HexagonView> = new Map();
+  // TODO: switch hexMap over to array
   private mapContainer: PIXI.Container;
   private initialized: boolean = false;
 
@@ -25,6 +25,8 @@ export class HexMapScreen extends PIXI.Container {
   private isDragging = false;
   private dragStart = { x: 0, y: 0 };
   private mapStart = { x: 0, y: 0 };
+
+  private map_width = 0;
 
   constructor() {
     super();
@@ -62,8 +64,11 @@ export class HexMapScreen extends PIXI.Container {
   private handleWebSocketMessage(message: any) {
     switch (message.type) {
       case 'grid_state':
+        console.log("grid_state")
         if (!this.initialized) {
+      console.log({message});
         this.createHexGrid(message.width, message.height);
+        this.map_width = message.width;
       }
 
       this.updateGridState(message.tiles);
@@ -79,26 +84,37 @@ export class HexMapScreen extends PIXI.Container {
     }
   }
 
-  private updateGridState(tiles: Array<{ col: number; row: number; data: Partial<HexData> }>) {
+  private updateGridState(tiles: Array<{ col: number; row: number; data: Partial<HexTile> }>) {
+    console.log("updatign");
     tiles.forEach(tile => {
       this.updateTile(tile);
     });
   }
 
-  private updateTile({col, row, data}: { col: number; row: number; data: Partial<HexData> }) {
-    const key = `${col},${row}`;
-    const hex: HexagonView | undefined = this.hexMap.get(key);
+  private updateTile({col, row, data}: { col: number; row: number; data: Partial<HexTile> }) {
+
+    const index = this.map_width * row + col;
+
+    const hex = this.hexes[index];
 
     if (hex) {
-      Object.assign(hex.data, data);
+      // rust type gen compatibility is quite terrible, it can be either string or object for enum
+      // also js strings are primitives, not objects? :(
+      if (typeof data === 'string') {
+        hex.data = data;
+      } else {
+        Object.assign(hex.data, data);
+      }
 
-      if (data.terrain) {
+      if (data) {
         hex.draw();
       }
     }
+
+    console.log("done");
   }
 
-  public sendTileUpdate(col: number, row: number, data: Partial<HexData>) {
+  public sendTileUpdate(col: number, row: number, data: Partial<HexTile>) {
     this.wsClient.sendMessage(JSON.stringify({
       type: 'tile_update',
       col,
@@ -140,7 +156,7 @@ export class HexMapScreen extends PIXI.Container {
 
     g.on("pointerover", (_) => {
       if (!this.isDragging) {
-        this.tooltip.text = `x: ${col}, y: ${row}, terrain: ${g.data.terrain}`;
+        this.tooltip.text = `x: ${col}, y: ${row}, terrain: ${g.data}`;
         this.tooltip.visible = true;
         this.tooltipBackground.visible = true;
       }
@@ -148,9 +164,9 @@ export class HexMapScreen extends PIXI.Container {
 
     g.on("pointerdown", (ev) => {
       if (ev.button === 0 && !this.isDragging) {
-        const newTerrain: TerrainType = "Slime";
+        const newTerrain: HexTile = "Slime";
 
-        this.sendTileUpdate(col, row, { terrain: newTerrain });
+        this.sendTileUpdate(col, row, newTerrain);
 
         console.log(`Clicked hex at [${col},${row}]:`, g.data);
       }
@@ -181,16 +197,13 @@ export class HexMapScreen extends PIXI.Container {
   private createHexGrid(width: number, height: number) {
     this.initialized = true;
 
-    for (let row = 0; row < width; row++) {
-      for (let col = 0; col < height; col++) {
-        const g = new HexagonView({ terrain: DEFAULT_TERRAIN }, row, col);
+    for (let row = 0; row < height; row++) {
+      for (let col = 0; col < width; col++) {
+        const g = new HexagonView(DEFAULT_TERRAIN, row, col);
 
         g.draw();
 
         this.registerHexEvent(g, row, col);
-
-        const key = `${col},${row}`;
-        this.hexMap.set(key, g);
 
         this.mapContainer.addChild(g);
         this.hexes.push(g);

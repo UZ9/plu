@@ -1,18 +1,18 @@
 import * as PIXI from "pixi.js";
-import { HexData, TerrainType } from "../../../types/types";
+import { HexTile } from "../../../types/types";
 import { hexPoints, hexToPixel } from "../utils/mathUtils";
 
-const terrainColors: Record<TerrainType, number> = {
-  "Mine": 0x4CAF50,
+const terrainColors: Record<string, number> = {
+  "Mine": 0x2196F3,
   "Slime": 0x757575,
   "Wild": 0x4CAF50,
   "Turret": 0x2196F3,
 };
 
 export class HexagonView extends PIXI.Graphics {
-  public data: HexData;
+  public data: HexTile;
 
-  constructor(data: HexData, row: number, col: number) {
+  constructor(data: HexTile, row: number, col: number) {
     super();
     this.data = data;
 
@@ -29,7 +29,13 @@ export class HexagonView extends PIXI.Graphics {
   }
 
   public draw() {
-    const color = terrainColors[this.data.terrain];
+    let color = 0xff0000;
+
+    if (typeof this.data === "string") {
+      color = terrainColors[this.data as string];
+    } else {
+      color = terrainColors[Object.keys(this.data)[0]];
+    }
 
     this.clear();
     this.poly(hexPoints).stroke({ width: 2, color: 0x2b2b2b }).fill(color);
