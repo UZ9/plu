@@ -83,6 +83,8 @@ impl GridState {
 
 #[cfg(test)]
 mod tests {
+    use crate::types::MineData;
+
     use super::*;
 
     #[test]
@@ -133,6 +135,80 @@ mod tests {
 
         assert!(tile.is_some());
         assert_eq!(tile.unwrap().clone(), start_tile);
+    }
+
+    #[test]
+    fn it_can_set_slime_tile() {
+        let start_tile = HexTile::Slime;
+
+        let mut grid_state = GridState::new(72, 30, start_tile.clone());
+
+        assert_eq!(grid_state.width, 72);
+        assert_eq!(grid_state.height, 30);
+
+        // 12x8, so:
+        // (1, 0) should be 1
+        // (0, 1) should be width
+        // (13, 18) should be 18 * width + 13 (18th row, each row has width pixels)
+        let tile = grid_state.get_tile(1, 0);
+
+        assert!(tile.is_some());
+        assert_eq!(tile.unwrap().clone(), start_tile);
+
+        // now we change it 
+        grid_state.set_tile(1, 0, HexTile::Slime);
+
+        assert_eq!(grid_state.get_tile(1, 0).unwrap().clone(), HexTile::Slime);
+
+        // should've also been registered
+        assert!(grid_state.slime_tiles.contains(&grid_state.get_index(1, 0)));
+
+        // now we change it back to wild 
+        grid_state.set_tile(1, 0, HexTile::Wild);
+
+        // should be unregistered
+        assert!(!grid_state.slime_tiles.contains(&grid_state.get_index(1, 0)));
+    }
+
+    #[test]
+    fn it_can_set_mine_tile() {
+        let start_tile = HexTile::Slime;
+
+        let mut grid_state = GridState::new(72, 30, start_tile.clone());
+
+        assert_eq!(grid_state.width, 72);
+        assert_eq!(grid_state.height, 30);
+
+        // 12x8, so:
+        // (1, 0) should be 1
+        // (0, 1) should be width
+        // (13, 18) should be 18 * width + 13 (18th row, each row has width pixels)
+        let tile = grid_state.get_tile(1, 0);
+
+        assert!(tile.is_some());
+        assert_eq!(tile.unwrap().clone(), start_tile);
+
+        let new_tile = HexTile::Mine(MineData {
+            level: 1,
+            count: 1,
+            capacity: 3,
+            state: "state".to_string(),
+            trade_value: 0
+        });
+
+        // now we change it 
+        grid_state.set_tile(1, 0, new_tile.clone());
+
+        assert_eq!(grid_state.get_tile(1, 0).unwrap().clone(), new_tile);
+
+        // should've also been registered
+        assert!(grid_state.mine_tiles.contains(&grid_state.get_index(1, 0)));
+
+        // now we change it back to wild 
+        grid_state.set_tile(1, 0, HexTile::Wild);
+
+        // should be unregistered
+        assert!(!grid_state.mine_tiles.contains(&grid_state.get_index(1, 0)));
     }
 
     // test for invalid range tile
