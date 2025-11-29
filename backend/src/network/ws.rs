@@ -8,7 +8,7 @@ use futures::SinkExt;
 use log::{debug, info};
 use tokio::sync::RwLock;
 
-use crate::{api::grid_api::GridState, types::{ClientMessage, HexTile, ServerMessage, TileState}, UpdateBroadcast, MAP_HEIGHT, MAP_WIDTH};
+use crate::{api::grid_api::GridState, types::{ClientMessage, HexTile, ServerMessage, TileState}, UpdateBroadcast};
 
 pub struct WebSocketServer {
     path: String
@@ -93,8 +93,8 @@ async fn on_receive_message(state: &Arc<RwLock<GridState>>, tx: &UpdateBroadcast
                 for j in 0..grid.height {
                     update.push(TileState {
                         data: tiles[i].clone(),
-                        row: i as i32,
-                        col: j as i32
+                        row: j as i32,
+                        col: i as i32
                     });
                 }
             });
@@ -125,6 +125,8 @@ async fn ws_handler(
 
 #[cfg(test)]
 mod tests {
+    use std::cmp::{max, min};
+
     use tokio::sync::broadcast;
 
     use super::*;
@@ -204,14 +206,31 @@ mod tests {
                 assert_eq!(tiles.len(), grid.tiles.len());
                 assert_eq!(tiles.len(), 15 * 10);
 
+                let mut min_x = 999999;
+                let mut max_x = -999999;
+                let mut min_y = 999999;
+                let mut max_y = -999999;
+
+
                 tiles.iter().for_each(|tile| {
+
+                    min_x = min(tile.col, min_x);
+                    max_x = max(tile.col, max_x);
+
+                    min_y = min(tile.row, min_y);
+                    max_y = max(tile.row, max_y);
+
                     assert_eq!(tile.data.clone(), HexTile::Wild);
                 });
+
+                assert_eq!(min_x, 0);
+                assert_eq!(min_y, 0);
+                assert_eq!(max_x, grid.width as i32 - 1);
+                assert_eq!(max_y, grid.height as i32 - 1);
             },
             _ => {
                 panic!("invalid response")
             }
         }
     }
-
 }
