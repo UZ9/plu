@@ -1,21 +1,13 @@
-// main api, everyone gets this 
-trait GlobalApi {
+// main api, everyone gets this
+trait GlobalApi {}
 
-}
-
-// miner api 
+// miner api
 trait MineConductor {
     fn tick();
-
 }
 
-// logistics api 
-trait LogisticsConductor {
+// logistics api
+trait LogisticsConductor {}
 
-}
-
-
-// defender api 
-trait DefenderConductor {
-
-}
+// defender api
+trait DefenderConductor {}

@@ -2,7 +2,7 @@
 
 import { logDebug, logError, logInfo } from "../utils/logger";
 
-const BACKEND_URL="ws://localhost:9001/ws"
+const BACKEND_URL = "ws://localhost:9001/ws";
 
 export type WebSocketMessageHandler = (message: any) => void;
 
@@ -29,8 +29,8 @@ export class WebSocketManager {
     }
 
     this.socket.onopen = () => {
-      logInfo("WebSocket connected")
-      this.socket?.send(JSON.stringify({ type: 'request_grid_state' }));
+      logInfo("WebSocket connected");
+      this.socket?.send(JSON.stringify({ type: "request_grid_state" }));
     };
 
     this.socket.onmessage = (event) => {

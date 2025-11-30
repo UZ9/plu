@@ -7,12 +7,12 @@ pub struct GridState {
     pub height: usize,
     pub tiles: Vec<HexTile>,
 
-    // TODO: for performance reasons these lists are more or less hardcoded 
-    // to ensure priority (e.g. mines running before slime); ideally I'd like 
+    // TODO: for performance reasons these lists are more or less hardcoded
+    // to ensure priority (e.g. mines running before slime); ideally I'd like
     // some more ideomatic rust way to handle this
     pub slime_tiles: Vec<usize>,
     pub mine_tiles: Vec<usize>,
-    pub turret_tiles: Vec<usize>
+    pub turret_tiles: Vec<usize>,
 }
 
 impl GridState {
@@ -43,15 +43,11 @@ impl GridState {
     }
 
     pub fn get_neighbors(&self, x: u32, y: u32) -> impl Iterator<Item = usize> {
-        // neighbors: 
-        // (-1, 0), (1, 0) left and right 
+        // neighbors:
+        // (-1, 0), (1, 0) left and right
         // (-1, -1), (0, -1) top left, top right
         // (1, 1), (0, 1) bottom left, bottom right
-        const NEIGHBORS: [(i8, i8); 6] = [
-            (-1, 0), (1, 0),
-            (-1, -1), (0, -1),
-            (1, 1), (0, 1)
-        ];
+        const NEIGHBORS: [(i8, i8); 6] = [(-1, 0), (1, 0), (-1, -1), (0, -1), (1, 1), (0, 1)];
 
         // TODO: bounds checking
         NEIGHBORS.iter().filter_map(move |&(dx, dy)| {
@@ -60,7 +56,7 @@ impl GridState {
 
             if nx < 0 || ny < 0 {
                 return None;
-            } 
+            }
 
             let index = self.get_index(nx.try_into().unwrap(), ny.try_into().unwrap());
 
@@ -78,23 +74,25 @@ impl GridState {
 
         let tile = self.tiles[index].clone();
 
-        // for priority, we keep a list for each "active" tile type 
-        // this requires unregistering/registering to keep it synchronized 
+        // for priority, we keep a list for each "active" tile type
+        // this requires unregistering/registering to keep it synchronized
         // with the main tile array
         self.unregister_tile(index, &tile);
         self.tiles[index] = new_tile.clone();
         self.register_tile(index, &new_tile);
 
-        
-        debug!("mines: {:?}, slimes: {:?}", self.mine_tiles, self.slime_tiles);
+        debug!(
+            "mines: {:?}, slimes: {:?}",
+            self.mine_tiles, self.slime_tiles
+        );
     }
 
     fn unregister_tile(&mut self, i: usize, t: &HexTile) {
         match t {
             HexTile::Mine(_) => {
                 self.mine_tiles.retain(|j| *j != i);
-            },
-            HexTile::Slime => { 
+            }
+            HexTile::Slime => {
                 self.slime_tiles.retain(|j| *j != i);
             }
             _ => {}
@@ -105,8 +103,8 @@ impl GridState {
         match t {
             HexTile::Mine(_) => {
                 self.mine_tiles.push(i);
-            },
-            HexTile::Slime => { 
+            }
+            HexTile::Slime => {
                 self.slime_tiles.push(i);
             }
             _ => {}
@@ -190,7 +188,7 @@ mod tests {
         assert!(tile.is_some());
         assert_eq!(tile.unwrap().clone(), start_tile);
 
-        // now we change it 
+        // now we change it
         grid_state.set_tile(1, 0, HexTile::Slime);
 
         assert_eq!(grid_state.get_tile(1, 0).unwrap().clone(), HexTile::Slime);
@@ -198,7 +196,7 @@ mod tests {
         // should've also been registered
         assert!(grid_state.slime_tiles.contains(&grid_state.get_index(1, 0)));
 
-        // now we change it back to wild 
+        // now we change it back to wild
         grid_state.set_tile(1, 0, HexTile::Wild);
 
         // should be unregistered
@@ -228,10 +226,10 @@ mod tests {
             count: 1,
             capacity: 3,
             state: "state".to_string(),
-            trade_value: 0
+            trade_value: 0,
         });
 
-        // now we change it 
+        // now we change it
         grid_state.set_tile(1, 0, new_tile.clone());
 
         assert_eq!(grid_state.get_tile(1, 0).unwrap().clone(), new_tile);
@@ -239,7 +237,7 @@ mod tests {
         // should've also been registered
         assert!(grid_state.mine_tiles.contains(&grid_state.get_index(1, 0)));
 
-        // now we change it back to wild 
+        // now we change it back to wild
         grid_state.set_tile(1, 0, HexTile::Wild);
 
         // should be unregistered
@@ -263,12 +261,11 @@ mod tests {
         assert_eq!(set.len(), 6);
         assert!(set.contains(&(target_center - 1))); // right
         assert!(set.contains(&(target_center + 1))); // right
-        assert!(set.contains(&(target_center - 1 - width ))); // top left
-        assert!(set.contains(&(target_center - width ))); // top right
-        assert!(set.contains(&(target_center + 1 + width ))); // bottom right
-        assert!(set.contains(&(target_center + width ))); // bottom left
+        assert!(set.contains(&(target_center - 1 - width))); // top left
+        assert!(set.contains(&(target_center - width))); // top right
+        assert!(set.contains(&(target_center + 1 + width))); // bottom right
+        assert!(set.contains(&(target_center + width))); // bottom left
     }
 
     // test for invalid range tile
-
 }

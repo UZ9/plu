@@ -3,10 +3,10 @@ import { HexTile } from "../../../types/types";
 import { hexPoints, hexToPixel } from "../utils/mathUtils";
 
 const terrainColors: Record<string, number> = {
-  "Mine": 0x2196F3,
-  "Slime": 0x6C2D47,
-  "Wild": 0x4CAF50,
-  "Turret": 0x2196F3,
+  Mine: 0x2196f3,
+  Slime: 0x6c2d47,
+  Wild: 0x4caf50,
+  Turret: 0x2196f3,
 };
 
 export class HexagonView extends PIXI.Graphics {

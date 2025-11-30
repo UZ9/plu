@@ -17,7 +17,6 @@ export class MainScreen extends Container {
   public mainContainer: Container;
   private paused = false;
 
-
   constructor() {
     super();
 

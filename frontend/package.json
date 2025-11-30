@@ -7,6 +7,7 @@
     "start": "npm run dev",
     "build": "npm run lint && tsc && vite build",
     "lint": "eslint .",
+    "format": "prettier --write \"**/*.{ts,tsx,json,js,jsx}\"",
     "dev": "vite"
   },
   "dependencies": {

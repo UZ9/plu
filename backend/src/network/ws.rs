@@ -1,28 +1,44 @@
-
 use std::{net::SocketAddr, sync::Arc};
 
-use axum::{extract::{ws::{Message, WebSocket}, WebSocketUpgrade}, response::IntoResponse, routing::get, Router};
+use axum::{
+    Router,
+    extract::{
+        WebSocketUpgrade,
+        ws::{Message, WebSocket},
+    },
+    response::IntoResponse,
+    routing::get,
+};
 
-use futures::StreamExt;
 use futures::SinkExt;
+use futures::StreamExt;
 use log::{debug, info};
 use tokio::sync::RwLock;
 
-use crate::{api::grid_api::GridState, types::{ClientMessage, HexTile, ServerMessage, TileState}, UpdateBroadcast};
+use crate::{
+    UpdateBroadcast,
+    api::grid_api::GridState,
+    types::{ClientMessage, HexTile, ServerMessage, TileState},
+};
 
 pub struct WebSocketServer {
-    path: String
+    path: String,
 }
 
 impl WebSocketServer {
     pub fn new(path: String) -> Self {
-        WebSocketServer {
-            path
-        }
+        WebSocketServer { path }
     }
 
-    pub async fn start_server(&self, addr: SocketAddr, state: Arc<RwLock<GridState>>, tx: UpdateBroadcast) {
-        let app = Router::new().route(&self.path, get(ws_handler)).with_state((state, tx));
+    pub async fn start_server(
+        &self,
+        addr: SocketAddr,
+        state: Arc<RwLock<GridState>>,
+        tx: UpdateBroadcast,
+    ) {
+        let app = Router::new()
+            .route(&self.path, get(ws_handler))
+            .with_state((state, tx));
 
         let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
 
@@ -32,7 +48,11 @@ impl WebSocketServer {
     }
 }
 
-async fn handle_socket(socket: WebSocket, state: Arc<RwLock<GridState>>, broadcast_tx: UpdateBroadcast) {
+async fn handle_socket(
+    socket: WebSocket,
+    state: Arc<RwLock<GridState>>,
+    broadcast_tx: UpdateBroadcast,
+) {
     let (mut sender, mut receiver) = socket.split();
     let mut broadcast_rx = broadcast_tx.subscribe();
 
@@ -77,15 +97,17 @@ async fn handle_socket(socket: WebSocket, state: Arc<RwLock<GridState>>, broadca
     }
 }
 
-async fn on_receive_message(state: &Arc<RwLock<GridState>>, tx: &UpdateBroadcast, message: ClientMessage) -> Option<ServerMessage> {
+async fn on_receive_message(
+    state: &Arc<RwLock<GridState>>,
+    tx: &UpdateBroadcast,
+    message: ClientMessage,
+) -> Option<ServerMessage> {
     match message {
         ClientMessage::RequestGridState => {
             debug!("[REQUEST] request grid state");
 
             let grid = state.read().await;
-            let tiles: &Vec<HexTile> = &grid
-                .tiles;
-
+            let tiles: &Vec<HexTile> = &grid.tiles;
 
             let mut update = Vec::new();
 
@@ -94,12 +116,16 @@ async fn on_receive_message(state: &Arc<RwLock<GridState>>, tx: &UpdateBroadcast
                     update.push(TileState {
                         data: tiles[i].clone(),
                         row: j as i32,
-                        col: i as i32
+                        col: i as i32,
                     });
                 }
             });
 
-            Some(ServerMessage::GridState { tiles: update, width: grid.width, height: grid.height })
+            Some(ServerMessage::GridState {
+                tiles: update,
+                width: grid.width,
+                height: grid.height,
+            })
         }
         ClientMessage::TileUpdate { col, row, data } => {
             debug!("[REQUEST] tile update for <col: {col}, row: {row}>");
@@ -111,14 +137,17 @@ async fn on_receive_message(state: &Arc<RwLock<GridState>>, tx: &UpdateBroadcast
 
             // acknowledged on backend, now update client
             Some(ServerMessage::TileUpdate { row, col, data })
-        },
-        _ => None
+        }
+        _ => None,
     }
 }
 
 async fn ws_handler(
     ws: WebSocketUpgrade,
-    axum::extract::State((state, tx)): axum::extract::State<(Arc<RwLock<GridState>>, UpdateBroadcast)>,
+    axum::extract::State((state, tx)): axum::extract::State<(
+        Arc<RwLock<GridState>>,
+        UpdateBroadcast,
+    )>,
 ) -> impl IntoResponse {
     ws.on_upgrade(|socket| handle_socket(socket, state, tx))
 }
@@ -142,12 +171,8 @@ mod tests {
 
     #[tokio::test]
     async fn it_returns_nothing_if_invalid_received_message() {
-        let state: Arc<RwLock<GridState>> = Arc::new(RwLock::new(GridState::new(
-            10,
-            10,
-            HexTile::Wild
-        )));
-
+        let state: Arc<RwLock<GridState>> =
+            Arc::new(RwLock::new(GridState::new(10, 10, HexTile::Wild)));
 
         let (tx, _) = broadcast::channel::<Vec<TileState>>(100);
 
@@ -158,17 +183,21 @@ mod tests {
 
     #[tokio::test]
     async fn it_returns_tile_update_for_tile_request() {
-        let state: Arc<RwLock<GridState>> = Arc::new(RwLock::new(GridState::new(
-            10,
-            10,
-            HexTile::Wild
-        )));
-
+        let state: Arc<RwLock<GridState>> =
+            Arc::new(RwLock::new(GridState::new(10, 10, HexTile::Wild)));
 
         let (tx, _) = broadcast::channel::<Vec<TileState>>(100);
 
-        let update = ClientMessage::TileUpdate { col: 1, row: 0, data: HexTile::Slime };
-        let expected_response = ServerMessage::TileUpdate { col: 1, row: 0, data: HexTile::Slime };
+        let update = ClientMessage::TileUpdate {
+            col: 1,
+            row: 0,
+            data: HexTile::Slime,
+        };
+        let expected_response = ServerMessage::TileUpdate {
+            col: 1,
+            row: 0,
+            data: HexTile::Slime,
+        };
 
         let response = on_receive_message(&state, &tx, update).await;
 
@@ -181,11 +210,8 @@ mod tests {
 
     #[tokio::test]
     async fn it_returns_grid_state_for_request() {
-        let state: Arc<RwLock<GridState>> = Arc::new(RwLock::new(GridState::new(
-            15,
-            10,
-            HexTile::Wild
-        )));
+        let state: Arc<RwLock<GridState>> =
+            Arc::new(RwLock::new(GridState::new(15, 10, HexTile::Wild)));
 
         let grid = state.read().await;
 
@@ -200,7 +226,11 @@ mod tests {
         let response = response.unwrap();
 
         match response {
-            ServerMessage::GridState { width, height, tiles } => {
+            ServerMessage::GridState {
+                width,
+                height,
+                tiles,
+            } => {
                 assert_eq!(width, 15);
                 assert_eq!(height, 10);
                 assert_eq!(tiles.len(), grid.tiles.len());
@@ -211,9 +241,7 @@ mod tests {
                 let mut min_y = 999999;
                 let mut max_y = -999999;
 
-
                 tiles.iter().for_each(|tile| {
-
                     min_x = min(tile.col, min_x);
                     max_x = max(tile.col, max_x);
 
@@ -227,7 +255,7 @@ mod tests {
                 assert_eq!(min_y, 0);
                 assert_eq!(max_x, grid.width as i32 - 1);
                 assert_eq!(max_y, grid.height as i32 - 1);
-            },
+            }
             _ => {
                 panic!("invalid response")
             }

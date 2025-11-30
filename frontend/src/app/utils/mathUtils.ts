@@ -12,8 +12,5 @@ export const hexPoints: number[] = [];
 
 for (let i = 0; i < 6; i++) {
   const angle = (Math.PI / 180) * (30 + i * 60);
-  hexPoints.push(
-    Math.cos(angle) * HEX_SIZE,
-    Math.sin(angle) * HEX_SIZE
-  );
+  hexPoints.push(Math.cos(angle) * HEX_SIZE, Math.sin(angle) * HEX_SIZE);
 }

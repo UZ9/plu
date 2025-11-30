@@ -8,7 +8,7 @@ const TOOLTIP_STYLE: PIXI.TextStyleOptions = {
   fontSize: 16,
   fill: 0xffffff,
   stroke: { color: 0x000000, width: 3 },
-}
+};
 
 const DEFAULT_TERRAIN: HexTile = "Slime";
 
@@ -38,19 +38,21 @@ export class HexMapScreen extends PIXI.Container {
     this.initTooltip();
     this.registerMapContainerEvents();
 
-    this.wsClient = new WebSocketManager(this.handleWebSocketMessage.bind(this));
+    this.wsClient = new WebSocketManager(
+      this.handleWebSocketMessage.bind(this),
+    );
     this.wsClient.connect();
   }
 
   private initTooltip() {
-      this.tooltipBackground = new PIXI.Graphics();
-      this.tooltipBackground.visible = false;
-      this.addChild(this.tooltipBackground);
+    this.tooltipBackground = new PIXI.Graphics();
+    this.tooltipBackground.visible = false;
+    this.addChild(this.tooltipBackground);
 
-      this.tooltip = new PIXI.Text({ text: "", style: TOOLTIP_STYLE });
+    this.tooltip = new PIXI.Text({ text: "", style: TOOLTIP_STYLE });
 
-      this.tooltip.visible = false;
-      this.addChild(this.tooltip);
+    this.tooltip.visible = false;
+    this.addChild(this.tooltip);
   }
 
   private registerMapContainerEvents() {
@@ -63,36 +65,49 @@ export class HexMapScreen extends PIXI.Container {
 
   private handleWebSocketMessage(message: any) {
     switch (message.type) {
-      case 'grid_state':
-        console.log("grid_state")
+      case "grid_state":
+        console.log("grid_state");
         if (!this.initialized) {
-      console.log({message});
-        this.createHexGrid(message.width, message.height);
-        this.map_width = message.width;
-      }
+          console.log({ message });
+          this.createHexGrid(message.width, message.height);
+          this.map_width = message.width;
+        }
 
-      this.updateGridState(message.tiles);
-      break;
-      case 'tile_update':
-        this.updateTile({col: message.col, data: message.data, row: message.row});
-      break;
-      case 'tiles_update':
+        this.updateGridState(message.tiles);
+        break;
+      case "tile_update":
+        this.updateTile({
+          col: message.col,
+          data: message.data,
+          row: message.row,
+        });
+        break;
+      case "tiles_update":
         message.tiles.forEach((tile: any) => this.updateTile(tile));
-      break;
+        break;
       default:
-        console.warn('Unknown message type:', message.type);
+        console.warn("Unknown message type:", message.type);
     }
   }
 
-  private updateGridState(tiles: Array<{ col: number; row: number; data: Partial<HexTile> }>) {
+  private updateGridState(
+    tiles: Array<{ col: number; row: number; data: Partial<HexTile> }>,
+  ) {
     console.log("updatign");
-    tiles.forEach(tile => {
+    tiles.forEach((tile) => {
       this.updateTile(tile);
     });
   }
 
-  private updateTile({col, row, data}: { col: number; row: number; data: Partial<HexTile> }) {
-
+  private updateTile({
+    col,
+    row,
+    data,
+  }: {
+    col: number;
+    row: number;
+    data: Partial<HexTile>;
+  }) {
     const index = this.map_width * row + col;
 
     const hex = this.hexes[index];
@@ -100,7 +115,7 @@ export class HexMapScreen extends PIXI.Container {
     if (hex) {
       // rust type gen compatibility is quite terrible, it can be either string or object for enum
       // also js strings are primitives, not objects? :(
-      if (typeof data === 'string') {
+      if (typeof data === "string") {
         hex.data = data;
       } else {
         Object.assign(hex.data, data);
@@ -115,12 +130,14 @@ export class HexMapScreen extends PIXI.Container {
   }
 
   public sendTileUpdate(col: number, row: number, data: Partial<HexTile>) {
-    this.wsClient.sendMessage(JSON.stringify({
-      type: 'tile_update',
-      col,
-      row,
-      data
-    }));
+    this.wsClient.sendMessage(
+      JSON.stringify({
+        type: "tile_update",
+        col,
+        row,
+        data,
+      }),
+    );
   }
 
   private onDragStart(event: PIXI.FederatedPointerEvent) {
@@ -160,7 +177,7 @@ export class HexMapScreen extends PIXI.Container {
         this.tooltip.visible = true;
         this.tooltipBackground.visible = true;
       }
-    })
+    });
 
     g.on("pointerdown", (ev) => {
       if (ev.button === 0 && !this.isDragging) {
@@ -182,14 +199,15 @@ export class HexMapScreen extends PIXI.Container {
 
         this.tooltipBackground.clear();
 
-        this.tooltipBackground.rect(
-          bounds.x - padding,
-          bounds.y - padding,
-          bounds.width + padding * 2,
-          bounds.height + padding * 2,
-        )
-        .stroke({ width: 1, color: 0xffffff, alpha: 0.5 })
-        .fill({ color: 0x000000, alpha: 0.8})
+        this.tooltipBackground
+          .rect(
+            bounds.x - padding,
+            bounds.y - padding,
+            bounds.width + padding * 2,
+            bounds.height + padding * 2,
+          )
+          .stroke({ width: 1, color: 0xffffff, alpha: 0.5 })
+          .fill({ color: 0x000000, alpha: 0.8 });
       }
     });
   }
