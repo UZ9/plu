@@ -35,6 +35,39 @@ impl GridState {
         (y as usize * self.width) + x as usize
     }
 
+    pub fn get_coords(&self, index: usize) -> (u32, u32) {
+        let x = index % self.width;
+        let y = index / self.width;
+
+        (x as u32, y as u32)
+    }
+
+    pub fn get_neighbors(&self, x: u32, y: u32) -> impl Iterator<Item = usize> {
+        // neighbors: 
+        // (-1, 0), (1, 0) left and right 
+        // (-1, -1), (0, -1) top left, top right
+        // (1, 1), (0, 1) bottom left, bottom right
+        const NEIGHBORS: [(i8, i8); 6] = [
+            (-1, 0), (1, 0),
+            (-1, -1), (0, -1),
+            (1, 1), (0, 1)
+        ];
+
+        // TODO: bounds checking
+        NEIGHBORS.iter().filter_map(move |&(dx, dy)| {
+            let nx = x as i32 + dx as i32;
+            let ny = y as i32 + dy as i32;
+
+            if nx < 0 || ny < 0 {
+                return None;
+            } 
+
+            let index = self.get_index(nx.try_into().unwrap(), ny.try_into().unwrap());
+
+            Some(index)
+        })
+    }
+
     pub fn get_tile(&self, x: u32, y: u32) -> Option<&HexTile> {
         self.tiles.get(self.get_index(x, y))
     }
@@ -83,6 +116,8 @@ impl GridState {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashSet;
+
     use crate::types::MineData;
 
     use super::*;
@@ -209,6 +244,29 @@ mod tests {
 
         // should be unregistered
         assert!(!grid_state.mine_tiles.contains(&grid_state.get_index(1, 0)));
+    }
+
+    #[test]
+    fn it_can_get_tile_neighbors() {
+        let start_tile = HexTile::Slime;
+
+        let width = 72;
+        let height = 30;
+
+        let mut grid_state = GridState::new(width, height, start_tile.clone());
+
+        let target_center = grid_state.get_index(5, 5);
+
+        let set = grid_state.get_neighbors(5, 5).collect::<HashSet<usize>>();
+
+        // should return 6 tiles
+        assert_eq!(set.len(), 6);
+        assert!(set.contains(&(target_center - 1))); // right
+        assert!(set.contains(&(target_center + 1))); // right
+        assert!(set.contains(&(target_center - 1 - width ))); // top left
+        assert!(set.contains(&(target_center - width ))); // top right
+        assert!(set.contains(&(target_center + 1 + width ))); // bottom right
+        assert!(set.contains(&(target_center + width ))); // bottom left
     }
 
     // test for invalid range tile

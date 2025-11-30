@@ -3,7 +3,7 @@ use std::{sync::Arc, time::Duration};
 use log::debug;
 use tokio::sync::{broadcast, RwLock};
 
-use crate::{api::grid_api::GridState, network::ws::WebSocketServer, types::{HexTile, TileState}};
+use crate::{api::grid_api::GridState, network::ws::WebSocketServer, types::{HexTile, MineData, TileState, TurretData}};
 
 const MAP_WIDTH: usize = 20;
 const MAP_HEIGHT: usize = 40;
@@ -25,6 +25,39 @@ async fn game_loop(state: Arc<RwLock<GridState>>, tx: UpdateBroadcast) {
 
         {
             debug!("sending update...");
+
+
+            let tiles_to_modify = {
+                let grid = state.read().await;
+
+                grid.slime_tiles.iter().flat_map(|t| {
+                    let (x, y) = grid.get_coords(*t);
+
+                    grid.get_neighbors(x, y).map(|n| grid.get_coords(n))
+                        .collect::<Vec<_>>()
+                })
+                .collect::<Vec<_>>()
+            };
+
+            {
+                let mut grid = state.write().await;
+
+                for (nx, ny) in tiles_to_modify {
+                    let tile = grid.get_tile(nx, ny).unwrap();
+
+                    if !matches!(tile, HexTile::Mine(_)) {
+                        grid.set_tile(nx, ny, HexTile::Mine(
+                                MineData {
+                                    count: 1,
+                                    level: 1,
+                                    capacity: 1,
+                                    trade_value: 1,
+                                    state: "".to_string()
+                                }
+                        ));
+                    }
+                }
+            }
 
             // 3 updates to happen (maybe not in this order)
             // 1. miner update 
