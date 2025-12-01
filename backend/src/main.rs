@@ -6,7 +6,7 @@ use tokio::sync::{RwLock, broadcast};
 use crate::{
     api::grid_api::GridState,
     network::ws::WebSocketServer,
-    types::{HexTile, MineData, TileState, TurretData},
+    types::{HexTile, MineData, TileState},
 };
 
 const MAP_WIDTH: usize = 20;

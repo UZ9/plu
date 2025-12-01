@@ -47,7 +47,7 @@ impl GridState {
         // (-1, 0), (1, 0) left and right
         // (-1, -1), (0, -1) top left, top right
         // (1, 1), (0, 1) bottom left, bottom right
-        const NEIGHBORS: [(i8, i8); 6] = [(-1, 0), (1, 0), (-1, -1), (0, -1), (1, 1), (0, 1)];
+        const NEIGHBORS: [(i8, i8); 6] = [(-1, 0), (1, 0), (1, -1), (0, -1), (1, 1), (0, 1)];
 
         // TODO: bounds checking
         NEIGHBORS.iter().filter_map(move |&(dx, dy)| {
@@ -261,7 +261,7 @@ mod tests {
         assert_eq!(set.len(), 6);
         assert!(set.contains(&(target_center - 1))); // right
         assert!(set.contains(&(target_center + 1))); // right
-        assert!(set.contains(&(target_center - 1 - width))); // top left
+        assert!(set.contains(&(target_center + 1 - width))); // top left
         assert!(set.contains(&(target_center - width))); // top right
         assert!(set.contains(&(target_center + 1 + width))); // bottom right
         assert!(set.contains(&(target_center + width))); // bottom left

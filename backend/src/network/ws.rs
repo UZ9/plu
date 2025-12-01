@@ -114,7 +114,7 @@ async fn on_receive_message(
             (0..grid.width).for_each(|i| {
                 for j in 0..grid.height {
                     update.push(TileState {
-                        data: tiles[i].clone(),
+                        data: tiles[grid.get_index(i as u32, j as u32)].clone(),
                         row: j as i32,
                         col: i as i32,
                     });
